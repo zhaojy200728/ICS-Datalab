@@ -1,7 +1,7 @@
 /* 
  * CS:APP Data Lab 
  * 
- * <Please put your name and userid here>
+ * <赵静怡 25800680034>
  * 
  * bits.c - Source file with your solutions to the Lab.
  *          This is the file you will hand in to your instructor.
@@ -146,7 +146,7 @@ NOTES:
  *   Rating: 1
  */
 int signMask(void) {
-  return 1;
+  return 1 << 31;
 }
 
 // P2
@@ -158,7 +158,7 @@ int signMask(void) {
  *   Rating: 2
  */
 int bitXor(int x, int y) {
-	return 2;
+	return ~(x & y) & ~(~x & ~y);
 }
 
 // P3
@@ -170,7 +170,8 @@ int bitXor(int x, int y) {
  *   Rating: 3
  */
 int negativePart(int x){
-  return 3;
+  int mask = x >> 31;
+  return (~x + 1) & mask;
 }
 
 
@@ -185,7 +186,13 @@ int negativePart(int x){
  *   Rating: 4
  */
 int copyByteWithin(int x, int src, int dst) {
-  return 4;
+  int shiftSrc = src << 3;
+  int shiftDst = dst << 3;
+
+  int byte = (x >> shiftSrc) & 0xFF;
+  int mask = 0xFF << shiftDst;
+
+  return (x & ~mask) | (byte << shiftDst);
 }
 
 // P5
@@ -198,7 +205,8 @@ int copyByteWithin(int x, int src, int dst) {
  *   Rating: 4
  */
 int logicalShift(int x, int n) {
-  return 5;
+  int mask = ~(((1 << 31) >> n) << 1);
+  return (x >> n) & mask;
 }
 
 // P6
@@ -210,7 +218,13 @@ int logicalShift(int x, int n) {
  *   Rating: 4
  */
 int swapNibblePairs(int x) {
-  return 6;
+  int mask = 0x0F | (0x0F << 8);
+  mask = mask | (mask << 16);
+
+  int low = (x & mask) << 4;
+  int high = (x >> 4) & mask;
+
+  return low | high;
 }
 
 // P7
@@ -223,7 +237,9 @@ int swapNibblePairs(int x) {
  *   Rating: 4
  */
 int secondLowestZeroBit(int x) {
-  return 7;
+  int y = ~x;
+  int rest = y & (y + ~0);
+  return rest & (~rest + 1);
 }
 
 // P8
@@ -236,7 +252,13 @@ int secondLowestZeroBit(int x) {
  *   Rating: 5
  */
 int oddParity(int x) {
-  return 8;
+  x = x ^ (x >> 16);
+  x = x ^ (x >> 8);
+  x = x ^ (x >> 4);
+  x = x ^ (x >> 2);
+  x = x ^ (x >> 1);
+
+  return !(x & 1);
 }
 
 // P9
@@ -249,7 +271,16 @@ int oddParity(int x) {
  *   Rating: 5
  */
 int rotateRightBits(int x, int n) {
-  return 9;
+  int k = n & 31;
+  int left = (~k + 1) & 31;
+
+  int sign = 1 << 31;
+  int mask = ~((sign >> k) << 1);
+
+  int right = (x >> k) & mask;
+  int wrap = x << left;
+
+  return right | wrap;
 }
 
 // P10
@@ -264,7 +295,15 @@ int rotateRightBits(int x, int n) {
  *   Rating: 5
  */
 int roundEvenPow2(int x, int n) {
-  return 10;
+  int half = 1 << (n + ~0);
+  int q = x >> n;
+
+  int halfBit = !!(x & half);
+  int lowBit = !!(x & (half + ~0));
+
+  int roundUp = halfBit & (lowBit | (q & 1));
+
+  return (q + roundUp) << n;
 }
 
 // P11
@@ -280,7 +319,20 @@ int roundEvenPow2(int x, int n) {
  *   Rating: 5
  */
 int midpointTowardFirst(int x, int y) {
-  return 11;
+  int midpoint = (x & y) + ((x ^ y) >> 1);
+
+  int sx = x >> 31;
+  int sy = y >> 31;
+  int signDiff = sx ^ sy;
+
+  int diff = x + (~y + 1);
+
+  int isLess = (signDiff & sx)
+             | (~signDiff & (diff >> 31));
+
+  int odd = (x ^ y) & 1;
+
+  return midpoint + (odd & !isLess);
 }
 
 
@@ -294,7 +346,23 @@ int midpointTowardFirst(int x, int y) {
  *   Rating: 7
  */
 int isBetweenEitherOrder(int x, int a, int b) {
-  return 12;
+  int sx = x >> 31;
+  int sa = a >> 31;
+  int sb = b >> 31;
+
+  int da = x + (~a + 1);
+  int db = x + (~b + 1);
+
+  int signA = sx ^ sa;
+  int signB = sx ^ sb;
+
+  int lessA = (signA & sx)
+              | (~signA & (da >> 31));
+
+  int lessB = (signB & sx)
+              | (~signB & (db >> 31));
+
+  return !!((lessA ^ lessB) | !(x ^ a) | !(x ^ b));
 }
 
 // P13
@@ -307,7 +375,19 @@ int isBetweenEitherOrder(int x, int a, int b) {
  *   Rating: 7
  */
 int mul5Sat(int x) {
-  return 13;
+  int four = x << 2;
+  int five = four + x;
+
+  int lost = (four >> 2) ^ x;
+  int flipped = (five ^ x) >> 31;
+
+  int overflow = !!(lost | flipped);
+  int mask = ~overflow + 1;
+
+  int tmin = 1 << 31;
+  int bound = ~tmin ^ (x >> 31);
+
+  return (mask & bound) | (~mask & five);
 }
 
 // P14
