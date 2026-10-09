@@ -400,7 +400,25 @@ int mul5Sat(int x) {
  *   Rating: 7
  */
 int classifyAdd3(int x, int y, int z) {
-  return 14;
+  int s1 = x + y;
+  int s2 = s1 + z;
+
+  int sx = x >> 31;
+  int sy = y >> 31;
+  int ss1 = s1 >> 31;
+  int sz = z >> 31;
+  int ss2 = s2 >> 31;
+
+  int over1 = (~(sx ^ sy)) & (sx ^ ss1);
+  int over2 = (~(ss1 ^ sz)) & (ss1 ^ ss2);
+
+  int posMask = (over1 & ~sx) | (over2 & ~ss1);
+  int negMask = (over1 & sx) | (over2 & ss1);
+
+  int positive = !!(posMask & ~negMask);
+  int negative = !!(negMask & ~posMask);
+
+  return positive + (~negative + 1);
 }
 
 // P15
@@ -417,7 +435,54 @@ int classifyAdd3(int x, int y, int z) {
  *   Rating: 7
  */
 unsigned floatScaleThreeHalves(unsigned uf) {
-  return 15;
+  unsigned sign = uf & 0x80000000u;
+  unsigned exp = (uf >> 23) & 0xFFu;
+  unsigned frac = uf & 0x7FFFFFu;
+
+  if (exp == 255u) {
+    return uf;
+  }
+
+  unsigned mant = frac;
+  if (exp != 0) {
+    mant |= 0x800000u;
+  }
+
+  unsigned triple = mant * 3u;
+
+  if (exp == 0) {
+    unsigned q = triple >> 1;
+
+    if ((triple & 1u) && (q & 1u)) {
+      q++;
+    }
+
+    return sign | q;
+  }
+
+  unsigned shift = (triple >= 0x2000000u) ? 2u : 1u;
+  unsigned q = triple >> shift;
+
+  unsigned remainder = triple & ((1u << shift) - 1u);
+  unsigned halfway = 1u << (shift - 1u);
+
+  if (remainder > halfway ||
+    (remainder == halfway && (q & 1u))) {
+      q++;
+  }
+
+  unsigned newExp = exp + shift - 1u;
+
+  if (q >= 0x1000000u) {
+    q >>= 1;
+    newExp++;
+  }
+
+  if (newExp >= 255u) {
+    return sign | 0x7F800000u;
+  }
+
+  return sign | (newExp << 23) | (q & 0x7FFFFFu);
 }
 
 // P16
@@ -433,7 +498,44 @@ unsigned floatScaleThreeHalves(unsigned uf) {
  *   Rating: 10
  */
 unsigned floatRoundEven(unsigned uf) {
-  return 16;
+  unsigned sign = uf & 0x80000000u;
+  unsigned exp = (uf >> 23) & 0xFFu;
+  unsigned frac = uf & 0x7FFFFFu;
+
+  if (exp == 255u) {
+    return uf;
+  }
+
+  if (exp < 126u) {
+    return sign;
+  }
+
+  if (exp == 126u) {
+    if (frac == 0) {
+      return sign;
+    }
+    return sign | 0x3F800000u;
+  }
+
+  if (exp >= 150u) {
+    return uf;
+  }
+
+  unsigned shift = 150u - exp;
+  unsigned mask = (1u << shift) - 1u;
+
+  unsigned remainder = frac & mask;
+  unsigned half = 1u << (shift - 1u);
+
+  unsigned result = uf & ~mask;
+
+  if (remainder > half ||
+    (remainder == half &&
+    ((result >> shift) & 1u))) {
+    result += 1u << shift;
+  }
+
+  return result;
 }
 
 // P17
@@ -447,7 +549,54 @@ unsigned floatRoundEven(unsigned uf) {
  *   Rating: 10
  */
 unsigned float_i2f(int x) {
-  return 17;
+  if (x == 0) {
+    return 0;
+  }
+
+  unsigned sign = 0;
+  unsigned mag = x;
+
+  if (x < 0) {
+    sign = 0x80000000u;
+    mag = ~mag + 1u;
+  }
+
+  unsigned temp = mag;
+  int msb = 0;
+
+  while (temp > 1u) {
+    temp >>= 1;
+    msb++;
+  }
+
+  unsigned exponent = (msb + 127) << 23;
+
+  if (msb <= 23) {
+    unsigned frac =
+      (mag << (23 - msb)) & 0x7FFFFFu;
+
+    return sign | exponent | frac;
+  }
+
+  unsigned shift = msb - 23;
+  unsigned mant = mag >> shift;
+
+  unsigned discarded =
+    mag & ((1u << shift) - 1u);
+
+  unsigned half = 1u << (shift - 1u);
+
+  if (discarded > half ||
+    (discarded == half && (mant & 1u))) {
+      mant++;
+
+      if (mant == (1u << 24)) {
+        mant >>= 1;
+        exponent += 1u << 23;
+      }
+  }
+
+  return sign | exponent | (mant & 0x7FFFFFu);
 }
 
 
@@ -461,7 +610,26 @@ unsigned float_i2f(int x) {
  *   Rating: 10
  */
 int bitCount(int x) {
-  return 18;
+  int mask1 = 0x55 | (0x55 << 8);
+  mask1 = mask1 | (mask1 << 16);
+
+  int mask2 = 0x33 | (0x33 << 8);
+  mask2 = mask2 | (mask2 << 16);
+
+  int mask4 = 0x0F | (0x0F << 8);
+  mask4 = mask4 | (mask4 << 16);
+
+  x = (x & mask1) + ((x >> 1) & mask1);
+
+  x = (x & mask2) + ((x >> 2) & mask2);
+
+  x = (x & mask4) + ((x >> 4) & mask4);
+
+  x = x + (x >> 8);
+
+  x = x + (x >> 16);
+
+  return x & 0x3F;
 }
 
 // P19
@@ -473,7 +641,22 @@ int bitCount(int x) {
  *   Max ops: 34
  *   Rating: 10
  */
-int bitReverse(int x)
-{
-  return 19;
+int bitReverse(int x) {
+  int mask = (0xFF << 8) | 0xFF;
+
+  x = ((x >> 16) & mask) | (x << 16);
+
+  mask = mask ^ (mask << 8);
+  x = ((x >> 8) & mask) | ((x & mask) << 8);
+
+  mask = mask ^ (mask << 4);
+  x = ((x >> 4) & mask) | ((x & mask) << 4);
+
+  mask = mask ^ (mask << 2);
+  x = ((x >> 2) & mask) | ((x & mask) << 2);
+
+  mask = mask ^ (mask << 1);
+  x = ((x >> 1) & mask) | ((x & mask) << 1);
+
+  return x;
 }
